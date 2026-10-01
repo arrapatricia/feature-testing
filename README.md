@@ -24,3 +24,9 @@ npx playwright install
 ```bash
 npx playwright test "tests/QB-49 - 2026-10-01.spec.ts"
 ```
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/playwright.yml`) runs on push/PR to `main`, weekdays on a schedule, and manually via **Actions → Run workflow** (optional spec filter). It runs headless Chromium and uploads the HTML report and traces as an artifact.
+
+Locally: `npm test` (headed off in CI only), `npm run test:headed`, `npm run report`.

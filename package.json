@@ -1,10 +1,13 @@
 {
-  "name": "qa",
+  "name": "feature-testing",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:api": "playwright test -c playwright.api.config.ts"
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ci": "CI=1 playwright test",
+    "report": "playwright show-report"
   },
   "keywords": [],
   "type": "commonjs",
