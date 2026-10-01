@@ -1,32 +1,42 @@
 # feature-testing
 
-Playwright scripts for testing new features per Jira card.
+Automated feature tests (Playwright + TypeScript) for Paramount web applications. Each feature under test gets its own spec, named after its Jira card.
+
+## Project structure
+
+```
+.github/workflows/   CI pipeline
+tests/               Playwright specs
+playwright.config.ts Shared test configuration
+```
 
 ## Naming convention
 
-`tests/[JIRA_CARD] - [Date of Testing].spec.ts` (e.g. `QB-49 - 2026-10-01.spec.ts`)
+Specs are named `[JIRA_CARD] - [Date of Testing].spec.ts`, for example `QB-49 - 2026-10-01.spec.ts`.
 
-## Test log
+## Getting started
 
-| Card | Date | Feature | Dev ticket |
-|------|------|---------|------------|
-| [QB-49](https://paramountdirect.atlassian.net/browse/QB-49) | 2026-10-01 | CTPL Web Service Update: COV charge (₱60 → ₱74) & VVIP auto opt-in, region dropdown | [RD-184](https://paramountdirect.atlassian.net/browse/RD-184) |
-
-## Setup
+Requires Node.js 20+.
 
 ```bash
-npm install
-npx playwright install
+npm ci
+npx playwright install chromium
 ```
 
-## Run
+## Running tests
 
 ```bash
-npx playwright test "tests/QB-49 - 2026-10-01.spec.ts"
+npm test                                   # all specs, headless in CI / headed-off locally
+npm run test:headed                        # watch the browser
+npx playwright test "tests/<spec file>"    # a single spec
+npm run report                             # open the last HTML report
 ```
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/playwright.yml`) runs on push/PR to `main`, weekdays on a schedule, and manually via **Actions → Run workflow** (optional spec filter). It runs headless Chromium and uploads the HTML report and traces as an artifact.
+GitHub Actions (`.github/workflows/playwright.yml`) runs the suite on pushes and pull requests to `main`, on a weekday schedule, and on demand via **Actions → Run workflow** (optional spec filter). Tests run headless on Chromium; the HTML report and traces are uploaded as a build artifact.
 
-Locally: `npm test` (headed off in CI only), `npm run test:headed`, `npm run report`.
+## Adding a new test
+
+1. Add `tests/<JIRA_CARD> - <YYYY-MM-DD>.spec.ts`.
+2. Run it locally, then push. CI picks it up automatically.
