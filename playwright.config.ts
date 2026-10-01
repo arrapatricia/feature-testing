@@ -22,6 +22,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'Google Chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
+    { name: 'Microsoft Edge', use: { ...devices['Desktop Edge'], channel: 'msedge' } },
   ],
 });

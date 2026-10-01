@@ -1,14 +1,219 @@
 import { test, expect, type Page } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 
-test.setTimeout(120000); 
+/**
+ * QB-49 | RD-184 - CTPL Web Service Update: COV charge adjustment & VVIP auto opt-in
+ * Test date: 2026-10-01
+ * Env: https://ctpl-demo.herokuapp.com
+ *
+ *  A. COV fee per region (API)        - Task A / Condition 1
+ *  B. Break scenarios (API)           - invalid / hostile input
+ *  C. Region dropdown + COV copy (UI) - Task B / Task C / Condition 2
+ *  D. Break scenarios (UI)            - tampered / failing fee lookup
+ *  E. E2E happy path                  - full application + BDO payment
+ */
 
-// Global variables
-let paymentUrl = '';
-let appliedFirstName = '';
-let appliedLastName = '';
+test.setTimeout(120000);
 
-test.describe.serial('CTPL End-to-End Flow', () => {
+const BASE = 'https://ctpl-demo.herokuapp.com';
+const FEES = `${BASE}/ctpl-vvip-fees`;
+const COV_FEE = '74.0';
+
+// Dropdown option value -> region. QB-49 Condition 1 scope (asserted):
+// NCR, 2, 3, 4A, 4B, 5, 6, 7, 8, 9, 10, 11, 12.
+const IN_SCOPE: Record<string, string> = {
+  '1': 'NCR', '4': 'Region II', '5': 'Region III', '6': 'Region IV-A', '7': 'Region IV-B',
+  '8': 'Region V', '9': 'Region VI', '10': 'Region VII', '11': 'Region VIII',
+  '13': 'Region IX', '14': 'Region X', '15': 'Region XI', '16': 'Region XII',
+};
+// Regions not yet covered by COV (CAR, I, NIR, XIII, BARMM) are intentionally not asserted:
+// the fee API still returns P74 for them for now.
+const OUT_OF_SCOPE: Record<string, string> = {
+  '2': 'CAR', '3': 'Region I', '12': 'NIR', '17': 'Region XIII', '18': 'BARMM',
+};
+
+async function getFees(request: any, regionId: string) {
+  const res = await request.get(FEES, { params: { vvip_agent_region_id: regionId } });
+  return { res, body: await res.json().catch(() => null) };
+}
+
+// ---------------------------------------------------------------------
+// A. COV fee per region (API)
+// ---------------------------------------------------------------------
+test.describe('QB-49 A | COV fee per region (API)', () => {
+  for (const [id, name] of Object.entries(IN_SCOPE)) {
+    test(`in-scope ${name} (id ${id}) charges COV P74`, async ({ request }) => {
+      const { res, body } = await getFees(request, id);
+      expect(res.status()).toBe(200);
+      expect(body.enabled).toBe(true);
+      expect(body.fees[id]).toBe(COV_FEE);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------
+// B. Break scenarios (API)
+// ---------------------------------------------------------------------
+test.describe('QB-49 B | Break scenarios (API)', () => {
+  const invalid: [string, string][] = [
+    ['zero', '0'], ['unknown id above range', '19'], ['negative', '-1'], ['non-numeric', 'abc'],
+    ['empty', ''], ['huge number', '999999999999'], ['float', '1.5'], ['list', '1,2'],
+    ['script tag', '<script>alert(1)</script>'],
+  ];
+  for (const [label, value] of invalid) {
+    test(`invalid region (${label}) returns no fee and no server error`, async ({ request }) => {
+      const { res, body } = await getFees(request, value);
+      expect(res.status()).toBeLessThan(500);
+      expect(Object.keys(body?.fees ?? {})).toHaveLength(0);
+    });
+  }
+
+  test('SQL-injection style input does not resolve to a region fee', async ({ request }) => {
+    const { res, body } = await getFees(request, "1' OR '1'='1");
+    expect(res.status()).toBeLessThan(500);
+    expect(Object.keys(body?.fees ?? {})).toHaveLength(0);
+  });
+
+  test('missing parameter returns no fee', async ({ request }) => {
+    const res = await request.get(FEES);
+    expect(res.status()).toBeLessThan(500);
+    expect(Object.keys((await res.json()).fees)).toHaveLength(0);
+  });
+
+  test('response never exposes a fee other than P74', async ({ request }) => {
+    for (const id of [...Object.keys(IN_SCOPE), ...Object.keys(OUT_OF_SCOPE)]) {
+      const { body } = await getFees(request, id);
+      for (const fee of Object.values(body.fees)) expect(fee).toBe(COV_FEE);
+    }
+  });
+
+  test('POST is not accepted on the fee endpoint', async ({ request }) => {
+    const res = await request.post(FEES, { data: { vvip_agent_region_id: '1' } });
+    expect([404, 405, 422]).toContain(res.status());
+  });
+});
+
+// ---------------------------------------------------------------------
+// C / D. UI: region dropdown + COV copy, and break scenarios
+// ---------------------------------------------------------------------
+async function openPolicyStep(page: Page) {
+  await page.goto(`${BASE}/apply`, { waitUntil: 'domcontentloaded' });
+  const close = page.locator('.modal-content', { has: page.locator('h3.modal-title', { hasText: 'Reminder' }) }).getByLabel('Close');
+  await close.waitFor({ state: 'visible', timeout: 15000 });
+  await close.click();
+
+  await page.locator('#paramount_client_contact_info_email_address').fill('qatest0321@gmail.com');
+  await page.locator('#paramount_client_first_name').fill(faker.person.firstName());
+  await page.locator('#paramount_client_surname').fill(faker.person.lastName());
+  await page.locator('#c2c_car_info_plate_number').fill(faker.string.alpha(3).toUpperCase() + faker.string.numeric(4));
+  await page.locator('#paramount_client_same_with_owner').selectOption({ label: 'Yes' });
+  await page.locator('#btn-personal').click();
+
+  await page.locator('#paramount_client_contact_info_address_number').waitFor({ state: 'visible' });
+  await page.locator('#paramount_client_contact_info_address_number').fill(faker.location.buildingNumber());
+  await page.locator('#paramount_client_contact_info_address_street').fill(faker.location.street());
+  await page.locator('#paramount_client_contact_info_address_building').fill(faker.company.name());
+  await page.locator('#paramount_client_contact_info_address_barangay').fill('Barangay 1');
+  await page.locator('#paramount_client_contact_info_address_province').selectOption({ label: 'Cebu' });
+  await page.waitForTimeout(2000);
+  await page.locator('#paramount_client_contact_info_address_city').selectOption({ index: 1 });
+  await page.locator('#paramount_client_contact_info_mobile_number').fill('9171234567');
+  await page.locator('#paramount_client_contact_info_telephone_number').fill(faker.string.numeric(7));
+  await page.locator('#btn-contact').evaluate((btn: HTMLButtonElement) => btn.click());
+
+  await page.locator('#policy_type').waitFor({ state: 'visible' });
+  await page.locator('#policy_type').selectOption({ value: '1' });
+  await page.waitForTimeout(2000);
+  await page.locator('#mv_type').selectOption({ label: 'Car' });
+}
+
+test.describe('QB-49 C | Region dropdown + COV copy (UI)', () => {
+  test('region dropdown lists all 18 regions with a placeholder', async ({ page }) => {
+    await openPolicyStep(page);
+    const options = page.locator('#lto_region option');
+    await expect(options).toHaveCount(19);
+    await expect(options.first()).toHaveText('Select Region');
+  });
+
+  test('COV notice states the P74 fee', async ({ page }) => {
+    await openPolicyStep(page);
+    await expect(page.getByText(/additional P\s?74 verification fee/i)).toBeVisible();
+  });
+
+  test('no VVIP opt-in prompt is shown (auto-applied)', async ({ page }) => {
+    await openPolicyStep(page);
+    await expect(page.locator('#has_added_vfee')).toHaveCount(0);
+  });
+
+  test('selecting an in-scope region triggers the fee lookup and enables Next', async ({ page }) => {
+    await openPolicyStep(page);
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/ctpl-vvip-fees') && r.status() === 200),
+      page.locator('#lto_region').selectOption({ value: '1' }),
+    ]);
+    expect((await resp.json()).fees['1']).toBe(COV_FEE);
+    await expect(page.locator('#btn-policy')).toBeEnabled({ timeout: 15000 });
+  });
+});
+
+test.describe('QB-49 D | Break scenarios (UI)', () => {
+  test('Next is blocked until a region is selected', async ({ page }) => {
+    await openPolicyStep(page);
+    await expect(page.locator('#btn-policy')).toBeDisabled();
+  });
+
+  test('resetting region to the placeholder blocks Next again', async ({ page }) => {
+    await openPolicyStep(page);
+    await page.locator('#lto_region').selectOption({ value: '1' });
+    await expect(page.locator('#btn-policy')).toBeEnabled({ timeout: 15000 });
+    await page.locator('#lto_region').selectOption({ value: '' });
+    await expect(page.locator('#btn-policy')).toBeDisabled();
+  });
+
+  test('fee lookup returning 500 does not let the user proceed', async ({ page }) => {
+    await page.route('**/ctpl-vvip-fees*', route => route.fulfill({ status: 500, body: 'boom' }));
+    await openPolicyStep(page);
+    await page.locator('#lto_region').selectOption({ value: '1' });
+    await page.waitForTimeout(3000);
+    await expect(page.locator('#btn-policy')).toBeDisabled();
+  });
+
+  test('fee lookup returning empty fees does not let the user proceed', async ({ page }) => {
+    await page.route('**/ctpl-vvip-fees*', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"enabled":true,"fees":{}}' }));
+    await openPolicyStep(page);
+    await page.locator('#lto_region').selectOption({ value: '1' });
+    await page.waitForTimeout(3000);
+    await expect(page.locator('#btn-policy')).toBeDisabled();
+  });
+
+  test('tampered fee (P0) in the response is not accepted', async ({ page }) => {
+    await page.route('**/ctpl-vvip-fees*', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"enabled":true,"fees":{"1":"0.0"}}' }));
+    await openPolicyStep(page);
+    await page.locator('#lto_region').selectOption({ value: '1' });
+    await page.waitForTimeout(3000);
+    await expect(page.locator('#btn-policy')).toBeDisabled();
+  });
+
+  test('changing region re-queries the fee each time', async ({ page }) => {
+    await openPolicyStep(page);
+    const seen: string[] = [];
+    page.on('request', r => {
+      if (r.url().includes('/ctpl-vvip-fees')) seen.push(new URL(r.url()).searchParams.get('vvip_agent_region_id') ?? '');
+    });
+    for (const id of ['1', '5', '10']) {
+      await page.locator('#lto_region').selectOption({ value: id });
+      await page.waitForTimeout(1500);
+    }
+    expect(seen).toEqual(['1', '5', '10']);
+  });
+});
+
+// ---------------------------------------------------------------------
+// E. E2E happy path
+// ---------------------------------------------------------------------
+test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', () => {
   let page: Page; // Declare a shared page variable
 
   // Setup: Create a single page context that survives across all tests in this block
@@ -88,6 +293,10 @@ test.describe.serial('CTPL End-to-End Flow', () => {
         ]);
     }
 
+    // QB-49 Task B: VVIP applied automatically, no client opt-in prompt.
+    await expect(page.locator('#has_added_vfee')).toHaveCount(0);
+    await expect(page.getByText(/additional P\s?74 verification fee/i)).toBeVisible();
+
     await expect(page.locator('#btn-policy')).toBeEnabled({ timeout: 15000 });
     await page.locator('#btn-policy').click();
 
@@ -109,24 +318,35 @@ test.describe.serial('CTPL End-to-End Flow', () => {
 
     await expect(page.locator('h4:has-text("Client Information")')).toBeVisible({ timeout: 15000 });
     await page.locator('#dpa_a').scrollIntoViewIfNeeded();
-    await page.locator('#dpa_a').check();
-    await page.locator('#dpa_b').check();
-    await page.locator('#dpa_c').check();
-    await page.locator('#dpa_d').check();
-    await page.locator('#dpa_e').check();
-
-    const acceptAllTermsBtn = page.getByText('Accept all terms and conditions stated above.');
-    if (await acceptAllTermsBtn.isVisible()) {
-        await acceptAllTermsBtn.click();
+    // "Accept all" is a toggle: ticking boxes individually first makes it untick them all.
+    await page.getByText('Accept all terms and conditions stated above.').click();
+    for (const id of ['a', 'b', 'c', 'd', 'e']) {
+        await expect(page.locator(`#dpa_${id}`)).toBeChecked();
     }
 
-    const confirmBtn = page.locator('.btn-confirm');
-    await confirmBtn.evaluate((node: HTMLButtonElement) => {
-        node.classList.remove('disabled');
-        node.click(); 
-    });
+    // Mobile OTP verification now gates submission (previously a direct .btn-confirm click).
+    const sendOtpLink = page.locator('#send-otp-link');
+    await sendOtpLink.waitFor({ state: 'visible', timeout: 10000 });
+    await Promise.all([
+        page.waitForResponse(resp => resp.url().includes('send-otp') && resp.status() === 200, { timeout: 15000 }),
+        sendOtpLink.click(),
+    ]);
 
-    await page.waitForURL('**/payment-instructions/**', { timeout: 30000 }); 
+    const otpInputs = page.locator('.otp-input');
+    await expect(otpInputs.first()).toBeEnabled({ timeout: 30000 });
+
+    const hardcodedOtp = '834793';
+    for (let i = 0; i < hardcodedOtp.length; i++) {
+        await otpInputs.nth(i).click();
+        await otpInputs.nth(i).pressSequentially(hardcodedOtp[i], { delay: 150 });
+    }
+    await page.locator('body').click();
+
+    const submitBtn = page.locator('#submit-application');
+    await expect(submitBtn).toBeEnabled({ timeout: 15000 });
+    await submitBtn.click();
+
+    await page.waitForURL('**/payment-instructions/**', { timeout: 30000 });
     paymentUrl = page.url(); 
     
     console.log('\n=========================================');
@@ -144,7 +364,7 @@ test.describe.serial('CTPL End-to-End Flow', () => {
 
     await page.goto(paymentUrl, { waitUntil: 'domcontentloaded' });
 
-    await page.getByRole('checkbox').first().check();
+    await page.getByRole('checkbox').first().check({ force: true });
     await page.locator('img[src*="online_icon.png"]').click();
     await page.locator('img[alt="BDO Online Bills Payment"]').click();
     await page.locator('#modal_btn_ok').click();

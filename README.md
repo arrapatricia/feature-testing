@@ -20,7 +20,7 @@ Requires Node.js 20+.
 
 ```bash
 npm ci
-npx playwright install chromium
+npx playwright install chrome msedge
 ```
 
 ## Running tests
@@ -34,7 +34,7 @@ npm run report                             # open the last HTML report
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/playwright.yml`) runs the suite on pushes and pull requests to `main`, on a weekday schedule, and on demand via **Actions → Run workflow** (optional spec filter). Tests run headless on Chromium; the HTML report and traces are uploaded as a build artifact.
+GitHub Actions (`.github/workflows/playwright.yml`) runs the suite on pushes and pull requests to `main`, on a weekday schedule, and on demand via **Actions → Run workflow** (optional spec filter). Tests run headless on Chrome and Edge; the HTML report and traces are uploaded as a build artifact.
 
 ## Adding a new test
 
