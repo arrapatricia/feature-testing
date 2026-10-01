@@ -40,3 +40,14 @@ GitHub Actions (`.github/workflows/playwright.yml`) runs the suite on pushes and
 
 1. Add `tests/<JIRA_CARD> - <YYYY-MM-DD>.spec.ts`.
 2. Run it locally, then push. CI picks it up automatically.
+
+## Running a single set and generating the report
+
+The QB-49 spec is split into vehicle sets. `SET=1` runs Private Car plus the API/UI scenarios, `SET=2` Motorcycle, `SET=3` Commercial Vehicle (unset runs all).
+
+```bash
+SET=1 PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test "tests/QB-49 - 2026-10-01.spec.ts" --reporter=list,html,json
+node scripts/gen-report.mjs results.json "Set 1 Private Car" "reports/QB-49 - 2026-10-01 - Set 1 Private Car"
+```
+
+`gen-report.mjs` writes `summary.md` and `summary.html` with Test Status, Expected Output, System Output and Test Remarks per test. Reports live under `reports/`.

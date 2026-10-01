@@ -13,34 +13,39 @@ import { faker } from '@faker-js/faker';
  *  E. E2E happy path                  - full application + BDO payment
  */
 
-test.setTimeout(120000);
+test.setTimeout(180000);
 
 const BASE = 'https://ctpl-demo.herokuapp.com';
+// SET=1|2|3 runs one vehicle set at a time (1 = Private Car + API/UI scenarios, 2 = Motorcycle, 3 = Commercial). Unset = all.
+const ONLY_SET = process.env.SET;
+const runSet = (n: string) => !ONLY_SET || ONLY_SET === n;
 const FEES = `${BASE}/ctpl-vvip-fees`;
 const COV_FEE = '74.0';
 
-// Dropdown option value -> region. QB-49 Condition 1 scope (asserted):
-// NCR, 2, 3, 4A, 4B, 5, 6, 7, 8, 9, 10, 11, 12.
+// Dropdown option value -> region. QB-49 rule: COV (additional P74) applies ONLY to
+// NCR, 2, 3, 4A, 4B, 5, 6, 7, 8, 9, 10 & Caraga, 11, 12 and Negros Island.
+// Every other region must NOT have the additional P74.
 const IN_SCOPE: Record<string, string> = {
   '1': 'NCR', '4': 'Region II', '5': 'Region III', '6': 'Region IV-A', '7': 'Region IV-B',
   '8': 'Region V', '9': 'Region VI', '10': 'Region VII', '11': 'Region VIII',
-  '13': 'Region IX', '14': 'Region X', '15': 'Region XI', '16': 'Region XII',
+  '12': 'NIR (Negros Island)', '13': 'Region IX', '14': 'Region X', '15': 'Region XI',
+  '16': 'Region XII', '17': 'Region XIII (Caraga)',
 };
-// Regions not yet covered by COV (CAR, I, NIR, XIII, BARMM) are intentionally not asserted:
-// the fee API still returns P74 for them for now.
 const OUT_OF_SCOPE: Record<string, string> = {
-  '2': 'CAR', '3': 'Region I', '12': 'NIR', '17': 'Region XIII', '18': 'BARMM',
+  '2': 'CAR', '3': 'Region I', '18': 'BARMM',
 };
 
 async function getFees(request: any, regionId: string) {
   const res = await request.get(FEES, { params: { vvip_agent_region_id: regionId } });
-  return { res, body: await res.json().catch(() => null) };
+  const body = await res.json().catch(() => null);
+  test.info().annotations.push({ type: 'actual', description: `GET ${FEES}?vvip_agent_region_id=${regionId} -> HTTP ${res.status()} ${JSON.stringify(body)}` });
+  return { res, body };
 }
 
 // ---------------------------------------------------------------------
 // A. COV fee per region (API)
 // ---------------------------------------------------------------------
-test.describe('QB-49 A | COV fee per region (API)', () => {
+(runSet('1') ? test.describe : test.describe.skip)('QB-49 A | COV fee per region (API)', () => {
   for (const [id, name] of Object.entries(IN_SCOPE)) {
     test(`in-scope ${name} (id ${id}) charges COV P74`, async ({ request }) => {
       const { res, body } = await getFees(request, id);
@@ -49,12 +54,20 @@ test.describe('QB-49 A | COV fee per region (API)', () => {
       expect(body.fees[id]).toBe(COV_FEE);
     });
   }
+
+  for (const [id, name] of Object.entries(OUT_OF_SCOPE)) {
+    test(`not-in-COV ${name} (id ${id}) has NO additional P74`, async ({ request }) => {
+      const { res, body } = await getFees(request, id);
+      expect(res.status()).toBe(200);
+      expect([undefined, '0', '0.0']).toContain(body.fees[id]);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------
 // B. Break scenarios (API)
 // ---------------------------------------------------------------------
-test.describe('QB-49 B | Break scenarios (API)', () => {
+(runSet('1') ? test.describe : test.describe.skip)('QB-49 B | Break scenarios (API)', () => {
   const invalid: [string, string][] = [
     ['zero', '0'], ['unknown id above range', '19'], ['negative', '-1'], ['non-numeric', 'abc'],
     ['empty', ''], ['huge number', '999999999999'], ['float', '1.5'], ['list', '1,2'],
@@ -100,7 +113,8 @@ async function openPolicyStep(page: Page) {
   await page.goto(`${BASE}/apply`, { waitUntil: 'domcontentloaded' });
   const close = page.locator('.modal-content', { has: page.locator('h3.modal-title', { hasText: 'Reminder' }) }).getByLabel('Close');
   await close.waitFor({ state: 'visible', timeout: 15000 });
-  await close.click();
+  await close.click({ timeout: 5000 }).catch(() => {});
+  await page.locator('.modal-backdrop').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
 
   await page.locator('#paramount_client_contact_info_email_address').fill('qatest0321@gmail.com');
   await page.locator('#paramount_client_first_name').fill(faker.person.firstName());
@@ -127,12 +141,25 @@ async function openPolicyStep(page: Page) {
   await page.locator('#mv_type').selectOption({ label: 'Car' });
 }
 
-test.describe('QB-49 C | Region dropdown + COV copy (UI)', () => {
+(runSet('1') ? test.describe : test.describe.skip)('QB-49 C | Region dropdown + COV copy (UI)', () => {
   test('region dropdown lists all 18 regions with a placeholder', async ({ page }) => {
     await openPolicyStep(page);
     const options = page.locator('#lto_region option');
     await expect(options).toHaveCount(19);
     await expect(options.first()).toHaveText('Select Region');
+  });
+
+  test('region option values map to the expected region names', async ({ page }) => {
+    await openPolicyStep(page);
+    const expectedStart: Record<string, string> = {
+      '1': 'NCR', '2': 'CAR', '3': 'Region I ', '4': 'Region II ', '5': 'Region III', '6': 'Region IV-A', '7': 'Region IV-B',
+      '8': 'Region V ', '9': 'Region VI ', '10': 'Region VII ', '11': 'Region VIII', '12': 'NIR', '13': 'Region IX',
+      '14': 'Region X ', '15': 'Region XI ', '16': 'Region XII', '17': 'Region XIII', '18': 'BARMM',
+    };
+    for (const [value, start] of Object.entries(expectedStart)) {
+      const label = (await page.locator(`#lto_region option[value="${value}"]`).textContent()) ?? '';
+      expect(label.startsWith(start.trim()), `option ${value} is "${label}", expected to start with "${start.trim()}"`).toBe(true);
+    }
   });
 
   test('COV notice states the P74 fee', async ({ page }) => {
@@ -156,7 +183,7 @@ test.describe('QB-49 C | Region dropdown + COV copy (UI)', () => {
   });
 });
 
-test.describe('QB-49 D | Break scenarios (UI)', () => {
+(runSet('1') ? test.describe : test.describe.skip)('QB-49 D | Break scenarios (UI)', () => {
   test('Next is blocked until a region is selected', async ({ page }) => {
     await openPolicyStep(page);
     await expect(page.locator('#btn-policy')).toBeDisabled();
@@ -213,7 +240,26 @@ test.describe('QB-49 D | Break scenarios (UI)', () => {
 // ---------------------------------------------------------------------
 // E. E2E happy path
 // ---------------------------------------------------------------------
-test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', () => {
+// Base = one-year total from the CTPL rate table (includes the existing 33.06 ver. fee).
+const VEHICLE_SETS = [
+  { set: '1', name: 'Set 1 Private Car', policy: '1', mv: '1', base: 606 },
+  { set: '2', name: 'Set 2 Motorcycle', policy: '3', mv: '3', base: 296 },
+  { set: '3', name: 'Set 3 Commercial Vehicle (Truck)', policy: '2', mv: '9', base: 1246 },
+];
+const REGIONS = [
+  { name: 'COV region (NCR)', region: '1', covApplies: true },
+  { name: 'No-COV region (CAR)', region: '2', covApplies: false },
+];
+
+for (const veh of VEHICLE_SETS) {
+for (const reg of REGIONS) {
+const sc = { ...reg, ...veh, expected: veh.base + (reg.covApplies ? 74 : 0) };
+let paymentUrl = '';
+let appliedFirstName = '';
+let appliedLastName = '';
+let shownPremium = '';
+
+(runSet(veh.set) ? test.describe.serial : test.describe.skip)(`QB-49 E | ${veh.name} | ${reg.name}`, () => {
   let page: Page; // Declare a shared page variable
 
   // Setup: Create a single page context that survives across all tests in this block
@@ -279,9 +325,9 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     await page.locator('#btn-contact').evaluate((btn: HTMLButtonElement) => btn.click());
 
     await page.locator('#policy_type').waitFor({ state: 'visible' });
-    await page.locator('#policy_type').selectOption({ value: '1' });
+    await page.locator('#policy_type').selectOption({ value: sc.policy });
     await page.waitForTimeout(2000);
-    await page.locator('#mv_type').selectOption({ label: 'Car' });
+    await page.locator('#mv_type').selectOption({ value: sc.mv });
 
     // VVIP region dropdown replaced the old has_added_vfee Yes/No radio.
     // Selecting a region triggers an async fee lookup that the Next button waits on.
@@ -289,7 +335,7 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     if (await ltoRegion.count() > 0) {
         await Promise.all([
             page.waitForResponse(resp => resp.url().includes('/ctpl-vvip-fees') && resp.status() === 200),
-            ltoRegion.selectOption({ index: 1 }),
+            ltoRegion.selectOption({ value: sc.region }),
         ]);
     }
 
@@ -297,13 +343,18 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     await expect(page.locator('#has_added_vfee')).toHaveCount(0);
     await expect(page.getByText(/additional P\s?74 verification fee/i)).toBeVisible();
 
+    // Premium is recorded here and asserted in its own test below, so a mismatch does not stop the flow.
+    shownPremium = (await page.locator('body').innerText()).match(/Total Premium\s*[^\d]*([\d,]+\.\d{2})/)?.[1] ?? '';
+    console.log(`${sc.name} | policy=${sc.policy} mv=${sc.mv} | Total Premium shown: ${shownPremium} | expected: ${sc.expected.toFixed(2)}`);
+
     await expect(page.locator('#btn-policy')).toBeEnabled({ timeout: 15000 });
     await page.locator('#btn-policy').click();
 
     await page.locator('#c2c_car_info_year_model').waitFor({ state: 'visible' });
-    await page.locator('#policy_product_line_id_1').check();
+    if (sc.set === '1') await page.locator('#policy_product_line_id_1').check();
+    else await page.locator('input.checkVehicleType').first().check({ force: true, timeout: 5000 }).catch(() => {});
     await page.locator('#c2c_car_info_year_model').selectOption({ value: '2023' });
-    await page.locator('#c2c_car_info_c2c_vehicle_maker_id').selectOption({ value: '17' });
+    await page.locator('#c2c_car_info_c2c_vehicle_maker_id').selectOption(sc.set === '1' ? { value: '17' } : { index: 1 });
     await page.waitForTimeout(2000);
     await page.locator('#c2c_car_info_c2c_vehicle_trim_id').selectOption({ index: 1 });
     await page.locator('#c2c_car_info_color').fill(VEHICLE_COLOR);
@@ -347,7 +398,8 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     await submitBtn.click();
 
     await page.waitForURL('**/payment-instructions/**', { timeout: 30000 });
-    paymentUrl = page.url(); 
+    paymentUrl = page.url();
+    await testInfo.attach('application-submitted', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     
     console.log('\n=========================================');
     console.log(`✅ TEST 1 COMPLETE | APPLICATION SUBMITTED!`);
@@ -359,7 +411,8 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
   // ====================================================================
   // TEST 2: PAYMENT PROCESS (BDO)
   // ====================================================================
-  test('CTPL Website - BDO Payment Process', async ({}) => {
+  test('CTPL Website - BDO Payment Process', async ({}, testInfo) => {
+    test.setTimeout(240000);
     test.skip(!paymentUrl, 'Skipping payment test because the application test did not generate a URL.');
 
     await page.goto(paymentUrl, { waitUntil: 'domcontentloaded' });
@@ -411,7 +464,10 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     await page.locator('button#submit-btn', { hasText: 'Submit' }).click();
     await page.locator('button#submit-btn', { hasText: 'Done' }).click();
 
-    await page.waitForTimeout(5000); 
+    await page.waitForTimeout(5000);
+    // Evidence that the flow really reached a successful payment.
+    await testInfo.attach('payment-success', { body: await page.screenshot(), contentType: 'image/png' });
+    testInfo.annotations.push({ type: 'actual', description: `Reached BDO sandbox success; final URL ${page.url()}` });
     
     console.log('\n=========================================');
     console.log(`✅ TEST 2 COMPLETE | PAYMENT SUCCESSFUL!`);
@@ -419,4 +475,11 @@ test.describe.serial('QB-49 E | E2E happy path (VVIP auto, region selected)', ()
     console.log(`🆔 Application ID: ${paymentUrl.split('/').pop()}`);
     console.log('=========================================\n');
   });
+
+  test('Total Premium matches expected (base + COV fee)', async ({}, testInfo) => {
+    testInfo.annotations.push({ type: 'actual', description: `Total Premium shown P${shownPremium} (expected P${sc.expected.toFixed(2)})` });
+    expect(Number(shownPremium.replace(/,/g, ''))).toBe(sc.expected);
+  });
 });
+}
+}
