@@ -26,7 +26,7 @@ npx playwright install chromium
 ## Running tests
 
 ```bash
-npm test                                   # all specs, headless in CI / headed-off locally
+npm test                                   # all specs, headless
 npm run test:headed                        # watch the browser
 npx playwright test "tests/<spec file>"    # a single spec
 npm run report                             # open the last HTML report
