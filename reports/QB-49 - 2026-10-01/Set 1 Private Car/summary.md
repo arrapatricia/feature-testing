@@ -80,3 +80,127 @@ Regions marked NO COV must not have the additional P74 verification fee.
 | CAR | 2 | NO COV (no additional P74) | P74.0 | FAILED |
 | Region I | 3 | NO COV (no additional P74) | P74.0 | FAILED |
 | BARMM | 18 | NO COV (no additional P74) | P74.0 | FAILED |
+
+## Screenshots and videos
+
+Files are in the `screenshots/` and `videos/` folders next to this summary.
+
+| Test | Status | File |
+|---|---|---|
+| QB-49 C \| Region dropdown + COV copy (UI) > COV notice states the P74 fee [Microsoft Edge] | passed | [screenshot](screenshots/01-qb-49-c-region-dropdown-cov-copy-ui-cov-notice-states-the-p74-fee-microsoft-edge-screenshot.png) |
+| QB-49 C \| Region dropdown + COV copy (UI) > COV notice states the P74 fee [Microsoft Edge] | passed | [video](videos/02-qb-49-c-region-dropdown-cov-copy-ui-cov-notice-states-the-p74-fee-microsoft-edge-video.webm) |
+| QB-49 C \| Region dropdown + COV copy (UI) > no VVIP opt-in prompt is shown (auto-applied) [Microsoft Edge] | passed | [screenshot](screenshots/03-qb-49-c-region-dropdown-cov-copy-ui-no-vvip-opt-in-prompt-is-shown-auto-applied-microsoft-edge-screenshot.png) |
+| QB-49 C \| Region dropdown + COV copy (UI) > no VVIP opt-in prompt is shown (auto-applied) [Microsoft Edge] | passed | [video](videos/04-qb-49-c-region-dropdown-cov-copy-ui-no-vvip-opt-in-prompt-is-shown-auto-applied-microsoft-edge-video.webm) |
+| QB-49 C \| Region dropdown + COV copy (UI) > region dropdown lists all 18 regions with a placeholder [Microsoft Edge] | passed | [screenshot](screenshots/05-qb-49-c-region-dropdown-cov-copy-ui-region-dropdown-lists-all-18-regions-with-a-placeholde-microsoft-edge-screenshot.png) |
+| QB-49 C \| Region dropdown + COV copy (UI) > region dropdown lists all 18 regions with a placeholder [Microsoft Edge] | passed | [video](videos/06-qb-49-c-region-dropdown-cov-copy-ui-region-dropdown-lists-all-18-regions-with-a-placeholde-microsoft-edge-video.webm) |
+| QB-49 C \| Region dropdown + COV copy (UI) > region option values map to the expected region names [Microsoft Edge] | passed | [screenshot](screenshots/07-qb-49-c-region-dropdown-cov-copy-ui-region-option-values-map-to-the-expected-region-names-microsoft-edge-screenshot.png) |
+| QB-49 C \| Region dropdown + COV copy (UI) > region option values map to the expected region names [Microsoft Edge] | passed | [video](videos/08-qb-49-c-region-dropdown-cov-copy-ui-region-option-values-map-to-the-expected-region-names-microsoft-edge-video.webm) |
+| QB-49 C \| Region dropdown + COV copy (UI) > selecting an in-scope region triggers the fee lookup and enables Next [Microsoft Edge] | passed | [screenshot](screenshots/09-qb-49-c-region-dropdown-cov-copy-ui-selecting-an-in-scope-region-triggers-the-fee-lookup-a-microsoft-edge-screenshot.png) |
+| QB-49 C \| Region dropdown + COV copy (UI) > selecting an in-scope region triggers the fee lookup and enables Next [Microsoft Edge] | passed | [video](videos/10-qb-49-c-region-dropdown-cov-copy-ui-selecting-an-in-scope-region-triggers-the-fee-lookup-a-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > changing region re-queries the fee each time [Microsoft Edge] | passed | [screenshot](screenshots/11-qb-49-d-break-scenarios-ui-changing-region-re-queries-the-fee-each-time-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > changing region re-queries the fee each time [Microsoft Edge] | passed | [video](videos/12-qb-49-d-break-scenarios-ui-changing-region-re-queries-the-fee-each-time-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > fee lookup returning 500 does not let the user proceed [Microsoft Edge] | passed | [screenshot](screenshots/13-qb-49-d-break-scenarios-ui-fee-lookup-returning-500-does-not-let-the-user-proceed-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > fee lookup returning 500 does not let the user proceed [Microsoft Edge] | passed | [video](videos/14-qb-49-d-break-scenarios-ui-fee-lookup-returning-500-does-not-let-the-user-proceed-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > fee lookup returning empty fees does not let the user proceed [Microsoft Edge] | passed | [screenshot](screenshots/15-qb-49-d-break-scenarios-ui-fee-lookup-returning-empty-fees-does-not-let-the-user-proceed-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > fee lookup returning empty fees does not let the user proceed [Microsoft Edge] | passed | [video](videos/16-qb-49-d-break-scenarios-ui-fee-lookup-returning-empty-fees-does-not-let-the-user-proceed-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > Next is blocked until a region is selected [Microsoft Edge] | passed | [screenshot](screenshots/17-qb-49-d-break-scenarios-ui-next-is-blocked-until-a-region-is-selected-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > Next is blocked until a region is selected [Microsoft Edge] | passed | [video](videos/18-qb-49-d-break-scenarios-ui-next-is-blocked-until-a-region-is-selected-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > resetting region to the placeholder blocks Next again [Microsoft Edge] | passed | [screenshot](screenshots/19-qb-49-d-break-scenarios-ui-resetting-region-to-the-placeholder-blocks-next-again-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > resetting region to the placeholder blocks Next again [Microsoft Edge] | passed | [video](videos/20-qb-49-d-break-scenarios-ui-resetting-region-to-the-placeholder-blocks-next-again-microsoft-edge-video.webm) |
+| QB-49 D \| Break scenarios (UI) > tampered fee (P0) in the response is not accepted [Microsoft Edge] | failed | [screenshot](screenshots/21-qb-49-d-break-scenarios-ui-tampered-fee-p0-in-the-response-is-not-accepted-microsoft-edge-screenshot.png) |
+| QB-49 D \| Break scenarios (UI) > tampered fee (P0) in the response is not accepted [Microsoft Edge] | failed | [video](videos/22-qb-49-d-break-scenarios-ui-tampered-fee-p0-in-the-response-is-not-accepted-microsoft-edge-video.webm) |
+| QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - Application Process [Microsoft Edge] | passed | [application-submitted](screenshots/23-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-application-process-microsoft-edge-application-submitted.png) |
+| QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - Application Process [Microsoft Edge] | passed | [screenshot](screenshots/24-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-application-process-microsoft-edge-screenshot.png) |
+| QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - BDO Payment Process [Microsoft Edge] | passed | [payment-success](screenshots/25-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-bdo-payment-process-microsoft-edge-payment-success.png) |
+| QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - BDO Payment Process [Microsoft Edge] | passed | [screenshot](screenshots/26-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-bdo-payment-process-microsoft-edge-screenshot.png) |
+| QB-49 E \| Set 1 Private Car \| COV region (NCR) > Total Premium matches expected (base + COV fee) [Microsoft Edge] | passed | [screenshot](screenshots/27-qb-49-e-set-1-private-car-cov-region-ncr-total-premium-matches-expected-base-cov-fee-microsoft-edge-screenshot.png) |
+| QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - Application Process [Microsoft Edge] | passed | [application-submitted](screenshots/28-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-application-process-microsoft-edge-application-submitted.png) |
+| QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - Application Process [Microsoft Edge] | passed | [screenshot](screenshots/29-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-application-process-microsoft-edge-screenshot.png) |
+| QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - BDO Payment Process [Microsoft Edge] | passed | [payment-success](screenshots/30-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-bdo-payment-process-microsoft-edge-payment-success.png) |
+| QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - BDO Payment Process [Microsoft Edge] | passed | [screenshot](screenshots/31-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-bdo-payment-process-microsoft-edge-screenshot.png) |
+| QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > Total Premium matches expected (base + COV fee) [Microsoft Edge] | failed | [screenshot](screenshots/32-qb-49-e-set-1-private-car-no-cov-region-car-total-premium-matches-expected-base-cov-fee-microsoft-edge-screenshot.png) |
+
+**QB-49 C \| Region dropdown + COV copy (UI) > COV notice states the P74 fee**
+
+![screenshot](screenshots/01-qb-49-c-region-dropdown-cov-copy-ui-cov-notice-states-the-p74-fee-microsoft-edge-screenshot.png)
+
+**QB-49 C \| Region dropdown + COV copy (UI) > no VVIP opt-in prompt is shown (auto-applied)**
+
+![screenshot](screenshots/03-qb-49-c-region-dropdown-cov-copy-ui-no-vvip-opt-in-prompt-is-shown-auto-applied-microsoft-edge-screenshot.png)
+
+**QB-49 C \| Region dropdown + COV copy (UI) > region dropdown lists all 18 regions with a placeholder**
+
+![screenshot](screenshots/05-qb-49-c-region-dropdown-cov-copy-ui-region-dropdown-lists-all-18-regions-with-a-placeholde-microsoft-edge-screenshot.png)
+
+**QB-49 C \| Region dropdown + COV copy (UI) > region option values map to the expected region names**
+
+![screenshot](screenshots/07-qb-49-c-region-dropdown-cov-copy-ui-region-option-values-map-to-the-expected-region-names-microsoft-edge-screenshot.png)
+
+**QB-49 C \| Region dropdown + COV copy (UI) > selecting an in-scope region triggers the fee lookup and enables Next**
+
+![screenshot](screenshots/09-qb-49-c-region-dropdown-cov-copy-ui-selecting-an-in-scope-region-triggers-the-fee-lookup-a-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > changing region re-queries the fee each time**
+
+![screenshot](screenshots/11-qb-49-d-break-scenarios-ui-changing-region-re-queries-the-fee-each-time-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > fee lookup returning 500 does not let the user proceed**
+
+![screenshot](screenshots/13-qb-49-d-break-scenarios-ui-fee-lookup-returning-500-does-not-let-the-user-proceed-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > fee lookup returning empty fees does not let the user proceed**
+
+![screenshot](screenshots/15-qb-49-d-break-scenarios-ui-fee-lookup-returning-empty-fees-does-not-let-the-user-proceed-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > Next is blocked until a region is selected**
+
+![screenshot](screenshots/17-qb-49-d-break-scenarios-ui-next-is-blocked-until-a-region-is-selected-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > resetting region to the placeholder blocks Next again**
+
+![screenshot](screenshots/19-qb-49-d-break-scenarios-ui-resetting-region-to-the-placeholder-blocks-next-again-microsoft-edge-screenshot.png)
+
+**QB-49 D \| Break scenarios (UI) > tampered fee (P0) in the response is not accepted**
+
+![screenshot](screenshots/21-qb-49-d-break-scenarios-ui-tampered-fee-p0-in-the-response-is-not-accepted-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - Application Process**
+
+![application-submitted](screenshots/23-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-application-process-microsoft-edge-application-submitted.png)
+
+**QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - Application Process**
+
+![screenshot](screenshots/24-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-application-process-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - BDO Payment Process**
+
+![payment-success](screenshots/25-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-bdo-payment-process-microsoft-edge-payment-success.png)
+
+**QB-49 E \| Set 1 Private Car \| COV region (NCR) > CTPL Website - BDO Payment Process**
+
+![screenshot](screenshots/26-qb-49-e-set-1-private-car-cov-region-ncr-ctpl-website-bdo-payment-process-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| COV region (NCR) > Total Premium matches expected (base + COV fee)**
+
+![screenshot](screenshots/27-qb-49-e-set-1-private-car-cov-region-ncr-total-premium-matches-expected-base-cov-fee-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - Application Process**
+
+![application-submitted](screenshots/28-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-application-process-microsoft-edge-application-submitted.png)
+
+**QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - Application Process**
+
+![screenshot](screenshots/29-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-application-process-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - BDO Payment Process**
+
+![payment-success](screenshots/30-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-bdo-payment-process-microsoft-edge-payment-success.png)
+
+**QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > CTPL Website - BDO Payment Process**
+
+![screenshot](screenshots/31-qb-49-e-set-1-private-car-no-cov-region-car-ctpl-website-bdo-payment-process-microsoft-edge-screenshot.png)
+
+**QB-49 E \| Set 1 Private Car \| No-COV region (CAR) > Total Premium matches expected (base + COV fee)**
+
+![screenshot](screenshots/32-qb-49-e-set-1-private-car-no-cov-region-car-total-premium-matches-expected-base-cov-fee-microsoft-edge-screenshot.png)
+
