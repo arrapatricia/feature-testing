@@ -354,9 +354,19 @@ let shownPremium = '';
     if (sc.set === '1') await page.locator('#policy_product_line_id_1').check();
     else await page.locator('input.checkVehicleType').first().check({ force: true, timeout: 5000 }).catch(() => {});
     await page.locator('#c2c_car_info_year_model').selectOption({ value: '2023' });
-    await page.locator('#c2c_car_info_c2c_vehicle_maker_id').selectOption(sc.set === '1' ? { value: '17' } : { index: 1 });
-    await page.waitForTimeout(2000);
-    await page.locator('#c2c_car_info_c2c_vehicle_trim_id').selectOption({ index: 1 });
+    if (sc.set === '1') {
+        await page.locator('#c2c_car_info_c2c_vehicle_maker_id').selectOption({ value: '17' });
+        await page.waitForTimeout(2000);
+    } else {
+        // Not every make has models for this vehicle type: pick the first make that lists at least one model.
+        const makerCount = await page.locator('#c2c_car_info_c2c_vehicle_maker_id option').count();
+        for (let i = 1; i < makerCount; i++) {
+            await page.locator('#c2c_car_info_c2c_vehicle_maker_id').selectOption({ index: i });
+            await page.waitForTimeout(1500);
+            if (await page.locator('#c2c_car_info_c2c_vehicle_trim_id option').count() > 1) break;
+        }
+    }
+    await page.locator('#c2c_car_info_c2c_vehicle_trim_id').selectOption({ index: 1 }, { timeout: 15000 });
     await page.locator('#c2c_car_info_color').fill(VEHICLE_COLOR);
     await page.locator('#btn-vehicle').evaluate((btn: HTMLButtonElement) => btn.click());
 

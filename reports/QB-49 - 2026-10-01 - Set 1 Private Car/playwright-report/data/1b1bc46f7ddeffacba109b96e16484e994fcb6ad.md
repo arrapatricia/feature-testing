@@ -1,0 +1,206 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: QB-49 - 2026-10-01.spec.ts >> QB-49 B | Break scenarios (API) >> invalid region (float) returns no fee and no server error
+- Location: tests\QB-49 - 2026-10-01.spec.ts:77:9
+
+# Error details
+
+```
+Error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+Received array:  ["1"]
+```
+
+# Test source
+
+```ts
+  1   | import { test, expect, type Page } from '@playwright/test';
+  2   | import { faker } from '@faker-js/faker';
+  3   | 
+  4   | /**
+  5   |  * QB-49 | RD-184 - CTPL Web Service Update: COV charge adjustment & VVIP auto opt-in
+  6   |  * Test date: 2026-10-01
+  7   |  * Env: https://ctpl-demo.herokuapp.com
+  8   |  *
+  9   |  *  A. COV fee per region (API)        - Task A / Condition 1
+  10  |  *  B. Break scenarios (API)           - invalid / hostile input
+  11  |  *  C. Region dropdown + COV copy (UI) - Task B / Task C / Condition 2
+  12  |  *  D. Break scenarios (UI)            - tampered / failing fee lookup
+  13  |  *  E. E2E happy path                  - full application + BDO payment
+  14  |  */
+  15  | 
+  16  | test.setTimeout(180000);
+  17  | 
+  18  | const BASE = 'https://ctpl-demo.herokuapp.com';
+  19  | // SET=1|2|3 runs one vehicle set at a time (1 = Private Car + API/UI scenarios, 2 = Motorcycle, 3 = Commercial). Unset = all.
+  20  | const ONLY_SET = process.env.SET;
+  21  | const runSet = (n: string) => !ONLY_SET || ONLY_SET === n;
+  22  | const FEES = `${BASE}/ctpl-vvip-fees`;
+  23  | const COV_FEE = '74.0';
+  24  | 
+  25  | // Dropdown option value -> region. QB-49 rule: COV (additional P74) applies ONLY to
+  26  | // NCR, 2, 3, 4A, 4B, 5, 6, 7, 8, 9, 10 & Caraga, 11, 12 and Negros Island.
+  27  | // Every other region must NOT have the additional P74.
+  28  | const IN_SCOPE: Record<string, string> = {
+  29  |   '1': 'NCR', '4': 'Region II', '5': 'Region III', '6': 'Region IV-A', '7': 'Region IV-B',
+  30  |   '8': 'Region V', '9': 'Region VI', '10': 'Region VII', '11': 'Region VIII',
+  31  |   '12': 'NIR (Negros Island)', '13': 'Region IX', '14': 'Region X', '15': 'Region XI',
+  32  |   '16': 'Region XII', '17': 'Region XIII (Caraga)',
+  33  | };
+  34  | const OUT_OF_SCOPE: Record<string, string> = {
+  35  |   '2': 'CAR', '3': 'Region I', '18': 'BARMM',
+  36  | };
+  37  | 
+  38  | async function getFees(request: any, regionId: string) {
+  39  |   const res = await request.get(FEES, { params: { vvip_agent_region_id: regionId } });
+  40  |   const body = await res.json().catch(() => null);
+  41  |   test.info().annotations.push({ type: 'actual', description: `GET ${FEES}?vvip_agent_region_id=${regionId} -> HTTP ${res.status()} ${JSON.stringify(body)}` });
+  42  |   return { res, body };
+  43  | }
+  44  | 
+  45  | // ---------------------------------------------------------------------
+  46  | // A. COV fee per region (API)
+  47  | // ---------------------------------------------------------------------
+  48  | (runSet('1') ? test.describe : test.describe.skip)('QB-49 A | COV fee per region (API)', () => {
+  49  |   for (const [id, name] of Object.entries(IN_SCOPE)) {
+  50  |     test(`in-scope ${name} (id ${id}) charges COV P74`, async ({ request }) => {
+  51  |       const { res, body } = await getFees(request, id);
+  52  |       expect(res.status()).toBe(200);
+  53  |       expect(body.enabled).toBe(true);
+  54  |       expect(body.fees[id]).toBe(COV_FEE);
+  55  |     });
+  56  |   }
+  57  | 
+  58  |   for (const [id, name] of Object.entries(OUT_OF_SCOPE)) {
+  59  |     test(`not-in-COV ${name} (id ${id}) has NO additional P74`, async ({ request }) => {
+  60  |       const { res, body } = await getFees(request, id);
+  61  |       expect(res.status()).toBe(200);
+  62  |       expect([undefined, '0', '0.0']).toContain(body.fees[id]);
+  63  |     });
+  64  |   }
+  65  | });
+  66  | 
+  67  | // ---------------------------------------------------------------------
+  68  | // B. Break scenarios (API)
+  69  | // ---------------------------------------------------------------------
+  70  | (runSet('1') ? test.describe : test.describe.skip)('QB-49 B | Break scenarios (API)', () => {
+  71  |   const invalid: [string, string][] = [
+  72  |     ['zero', '0'], ['unknown id above range', '19'], ['negative', '-1'], ['non-numeric', 'abc'],
+  73  |     ['empty', ''], ['huge number', '999999999999'], ['float', '1.5'], ['list', '1,2'],
+  74  |     ['script tag', '<script>alert(1)</script>'],
+  75  |   ];
+  76  |   for (const [label, value] of invalid) {
+  77  |     test(`invalid region (${label}) returns no fee and no server error`, async ({ request }) => {
+  78  |       const { res, body } = await getFees(request, value);
+  79  |       expect(res.status()).toBeLessThan(500);
+> 80  |       expect(Object.keys(body?.fees ?? {})).toHaveLength(0);
+      |                                             ^ Error: expect(received).toHaveLength(expected)
+  81  |     });
+  82  |   }
+  83  | 
+  84  |   test('SQL-injection style input does not resolve to a region fee', async ({ request }) => {
+  85  |     const { res, body } = await getFees(request, "1' OR '1'='1");
+  86  |     expect(res.status()).toBeLessThan(500);
+  87  |     expect(Object.keys(body?.fees ?? {})).toHaveLength(0);
+  88  |   });
+  89  | 
+  90  |   test('missing parameter returns no fee', async ({ request }) => {
+  91  |     const res = await request.get(FEES);
+  92  |     expect(res.status()).toBeLessThan(500);
+  93  |     expect(Object.keys((await res.json()).fees)).toHaveLength(0);
+  94  |   });
+  95  | 
+  96  |   test('response never exposes a fee other than P74', async ({ request }) => {
+  97  |     for (const id of [...Object.keys(IN_SCOPE), ...Object.keys(OUT_OF_SCOPE)]) {
+  98  |       const { body } = await getFees(request, id);
+  99  |       for (const fee of Object.values(body.fees)) expect(fee).toBe(COV_FEE);
+  100 |     }
+  101 |   });
+  102 | 
+  103 |   test('POST is not accepted on the fee endpoint', async ({ request }) => {
+  104 |     const res = await request.post(FEES, { data: { vvip_agent_region_id: '1' } });
+  105 |     expect([404, 405, 422]).toContain(res.status());
+  106 |   });
+  107 | });
+  108 | 
+  109 | // ---------------------------------------------------------------------
+  110 | // C / D. UI: region dropdown + COV copy, and break scenarios
+  111 | // ---------------------------------------------------------------------
+  112 | async function openPolicyStep(page: Page) {
+  113 |   await page.goto(`${BASE}/apply`, { waitUntil: 'domcontentloaded' });
+  114 |   const close = page.locator('.modal-content', { has: page.locator('h3.modal-title', { hasText: 'Reminder' }) }).getByLabel('Close');
+  115 |   await close.waitFor({ state: 'visible', timeout: 15000 });
+  116 |   await close.click({ timeout: 5000 }).catch(() => {});
+  117 |   await page.locator('.modal-backdrop').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+  118 | 
+  119 |   await page.locator('#paramount_client_contact_info_email_address').fill('qatest0321@gmail.com');
+  120 |   await page.locator('#paramount_client_first_name').fill(faker.person.firstName());
+  121 |   await page.locator('#paramount_client_surname').fill(faker.person.lastName());
+  122 |   await page.locator('#c2c_car_info_plate_number').fill(faker.string.alpha(3).toUpperCase() + faker.string.numeric(4));
+  123 |   await page.locator('#paramount_client_same_with_owner').selectOption({ label: 'Yes' });
+  124 |   await page.locator('#btn-personal').click();
+  125 | 
+  126 |   await page.locator('#paramount_client_contact_info_address_number').waitFor({ state: 'visible' });
+  127 |   await page.locator('#paramount_client_contact_info_address_number').fill(faker.location.buildingNumber());
+  128 |   await page.locator('#paramount_client_contact_info_address_street').fill(faker.location.street());
+  129 |   await page.locator('#paramount_client_contact_info_address_building').fill(faker.company.name());
+  130 |   await page.locator('#paramount_client_contact_info_address_barangay').fill('Barangay 1');
+  131 |   await page.locator('#paramount_client_contact_info_address_province').selectOption({ label: 'Cebu' });
+  132 |   await page.waitForTimeout(2000);
+  133 |   await page.locator('#paramount_client_contact_info_address_city').selectOption({ index: 1 });
+  134 |   await page.locator('#paramount_client_contact_info_mobile_number').fill('9171234567');
+  135 |   await page.locator('#paramount_client_contact_info_telephone_number').fill(faker.string.numeric(7));
+  136 |   await page.locator('#btn-contact').evaluate((btn: HTMLButtonElement) => btn.click());
+  137 | 
+  138 |   await page.locator('#policy_type').waitFor({ state: 'visible' });
+  139 |   await page.locator('#policy_type').selectOption({ value: '1' });
+  140 |   await page.waitForTimeout(2000);
+  141 |   await page.locator('#mv_type').selectOption({ label: 'Car' });
+  142 | }
+  143 | 
+  144 | (runSet('1') ? test.describe : test.describe.skip)('QB-49 C | Region dropdown + COV copy (UI)', () => {
+  145 |   test('region dropdown lists all 18 regions with a placeholder', async ({ page }) => {
+  146 |     await openPolicyStep(page);
+  147 |     const options = page.locator('#lto_region option');
+  148 |     await expect(options).toHaveCount(19);
+  149 |     await expect(options.first()).toHaveText('Select Region');
+  150 |   });
+  151 | 
+  152 |   test('region option values map to the expected region names', async ({ page }) => {
+  153 |     await openPolicyStep(page);
+  154 |     const expectedStart: Record<string, string> = {
+  155 |       '1': 'NCR', '2': 'CAR', '3': 'Region I ', '4': 'Region II ', '5': 'Region III', '6': 'Region IV-A', '7': 'Region IV-B',
+  156 |       '8': 'Region V ', '9': 'Region VI ', '10': 'Region VII ', '11': 'Region VIII', '12': 'NIR', '13': 'Region IX',
+  157 |       '14': 'Region X ', '15': 'Region XI ', '16': 'Region XII', '17': 'Region XIII', '18': 'BARMM',
+  158 |     };
+  159 |     for (const [value, start] of Object.entries(expectedStart)) {
+  160 |       const label = (await page.locator(`#lto_region option[value="${value}"]`).textContent()) ?? '';
+  161 |       expect(label.startsWith(start.trim()), `option ${value} is "${label}", expected to start with "${start.trim()}"`).toBe(true);
+  162 |     }
+  163 |   });
+  164 | 
+  165 |   test('COV notice states the P74 fee', async ({ page }) => {
+  166 |     await openPolicyStep(page);
+  167 |     await expect(page.getByText(/additional P\s?74 verification fee/i)).toBeVisible();
+  168 |   });
+  169 | 
+  170 |   test('no VVIP opt-in prompt is shown (auto-applied)', async ({ page }) => {
+  171 |     await openPolicyStep(page);
+  172 |     await expect(page.locator('#has_added_vfee')).toHaveCount(0);
+  173 |   });
+  174 | 
+  175 |   test('selecting an in-scope region triggers the fee lookup and enables Next', async ({ page }) => {
+  176 |     await openPolicyStep(page);
+  177 |     const [resp] = await Promise.all([
+  178 |       page.waitForResponse(r => r.url().includes('/ctpl-vvip-fees') && r.status() === 200),
+  179 |       page.locator('#lto_region').selectOption({ value: '1' }),
+  180 |     ]);
+```
