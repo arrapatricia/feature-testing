@@ -47,7 +47,7 @@ The QB-49 spec is split into vehicle sets. `SET=1` runs Private Car plus the API
 
 ```bash
 SET=1 PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test "tests/QB-49 - 2026-10-01.spec.ts" --reporter=list,html,json
-node scripts/gen-report.mjs results.json "Set 1 Private Car" "reports/QB-49 - 2026-10-01 - Set 1 Private Car"
+node scripts/gen-report.mjs results.json "Set 1 Private Car" "reports/QB-49 - 2026-10-01/Set 1 Private Car"
 ```
 
-`gen-report.mjs` writes `summary.md` and `summary.html` with Test Status, Expected Output, System Output and Test Remarks per test. Reports live under `reports/`.
+`gen-report.mjs` writes `summary.md` and `summary.html` with Test Status, Expected Output, System Output and Test Remarks per test. Reports live under `reports/`, one folder per Jira card (for example `reports/QB-49 - 2026-10-01/`) with a subfolder per set.
