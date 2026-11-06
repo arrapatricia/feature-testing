@@ -97,7 +97,12 @@ function record(testInfo: TestInfo, id: string, scenario: string, req: string, e
   testInfo.annotations.push({ type: 'expected', description: expected }, { type: 'actual', description: actual });
   summary.push([id, scenario, req, expected, String(c.http), String(c.body.StatusCode), String(count), String(c.ms), String(c.body.StatusDescription ?? '')]);
   fs.mkdirSync(REPORT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(REPORT_DIR, `${id}.json`), JSON.stringify({ request: req, http: c.http, ms: c.ms, response: c.body }, null, 2));
+  // Large lists: keep the first 100 rows in the proof file (the full list is tens of MB)
+  const rd = c.body?.ResponseData;
+  const body = rd && Array.isArray(rd.data) && rd.data.length > 100
+    ? { ...c.body, ResponseData: { ...rd, data: rd.data.slice(0, 100), note: `first 100 of ${rd.data.length} rows saved` } }
+    : c.body;
+  fs.writeFileSync(path.join(REPORT_DIR, `${id}.json`), JSON.stringify({ request: req, http: c.http, ms: c.ms, response: body }, null, 2));
   console.log(`${id} | ${scenario} | ${actual}`);
 }
 
@@ -110,12 +115,16 @@ function expectValidList(c: Call, exactDate?: string) {
   expect(rd.count, 'count = data.length').toBe(rd.data.length);
   const ymd = /^\d{4}-\d{2}-\d{2}$/;
   const lo = day(-60), hi = day(90);
-  for (const p of rd.data) {
-    expect(p.expiration_date, `${p.policy_number} expiration_date format`).toMatch(ymd);
-    expect(p.expiration_date >= lo && p.expiration_date <= hi, `${p.policy_number} ${p.expiration_date} within ${lo}..${hi}`).toBe(true);
-    if (p.date_issued !== null) expect(p.date_issued, `${p.policy_number} date_issued format`).toMatch(ymd);
-    if (exactDate) expect(p.expiration_date, `${p.policy_number} matches expd`).toBe(exactDate);
-  }
+  // One pass over the list (the full list is 76k+ rows - per-row expect() is far too slow)
+  const ids = (xs: any[]) => JSON.stringify(xs.slice(0, 5).map(p => [p.policy_number, p.expiration_date, p.date_issued]));
+  const badFormat = rd.data.filter((p: any) => !ymd.test(String(p.expiration_date)));
+  const outOfWindow = rd.data.filter((p: any) => p.expiration_date < lo || p.expiration_date > hi);
+  const badIssued = rd.data.filter((p: any) => p.date_issued !== null && !ymd.test(String(p.date_issued)));
+  const wrongDate = exactDate ? rd.data.filter((p: any) => p.expiration_date !== exactDate) : [];
+  expect(badFormat.length, `expiration_date not yyyy-MM-dd: ${ids(badFormat)}`).toBe(0);
+  expect(outOfWindow.length, `expiration_date outside ${lo}..${hi}: ${ids(outOfWindow)}`).toBe(0);
+  expect(badIssued.length, `date_issued not yyyy-MM-dd: ${ids(badIssued)}`).toBe(0);
+  expect(wrongDate.length, `expiration_date != expd ${exactDate}: ${ids(wrongDate)}`).toBe(0);
   return rd.data as any[];
 }
 
