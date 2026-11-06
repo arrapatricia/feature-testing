@@ -28,7 +28,9 @@ import * as path from 'path';
  * The UAT server is internal, so run this locally (on VPN / office network). Without PSNL_PRIVATE_KEY every test is skipped,
  * which keeps the GitHub Actions run green. API tests run once (Google Chrome project only) - no browser is used.
  *
- * Proof (response JSON + summary CSV) is written to reports/QB-48 - 2026-11-06/data.
+ * Proof is written to reports/QB-48 - 2026-11-06/:
+ *   summary.html / summary.md / summary.csv - one row per test case: Test Status, Expected Output, System Output, Test Remarks
+ *   data/<ID>.json                           - request + actual API response per test case (large lists trimmed to 100 rows)
  */
 
 test.setTimeout(240000);
@@ -50,8 +52,10 @@ const GROUP = process.env.QB48_GROUP || '30';
 const LINE = process.env.QB48_LINE || '7';
 const POLICY = process.env.QB48_POLICY || 'F-0000307634';
 
-const REPORT_DIR = path.join(process.cwd(), 'reports', 'QB-48 - 2026-11-06', 'data');
-const summary: string[][] = [['ID', 'Scenario', 'Request', 'Expected', 'HTTP', 'StatusCode', 'Count', 'Time (ms)', 'StatusDescription']];
+const REPORT_ROOT = path.join(process.cwd(), 'reports', 'QB-48 - 2026-11-06');
+const REPORT_DIR = path.join(REPORT_ROOT, 'data');
+type Row = { testId: string; id: string; scenario: string; req: string; expected: string; actual: string; ms: number; status: string; remarks: string };
+const rows: Row[] = [];
 
 const OUT_OF_WINDOW = 'must be within 60 days before today through 90 days after today';
 const NOT_A_DATE = 'is not a valid date';
@@ -95,7 +99,7 @@ function record(testInfo: TestInfo, id: string, scenario: string, req: string, e
   const count = c.body?.ResponseData?.count ?? '';
   const actual = `HTTP ${c.http}, StatusCode ${c.body.StatusCode}${count !== '' ? `, count ${count}` : ''}, ${c.ms} ms - ${c.body.StatusDescription ?? ''}`;
   testInfo.annotations.push({ type: 'expected', description: expected }, { type: 'actual', description: actual });
-  summary.push([id, scenario, req, expected, String(c.http), String(c.body.StatusCode), String(count), String(c.ms), String(c.body.StatusDescription ?? '')]);
+  rows.push({ testId: testInfo.testId, id, scenario, req, expected, actual, ms: c.ms, status: 'RUNNING', remarks: '' });
   fs.mkdirSync(REPORT_DIR, { recursive: true });
   // Large lists: keep the first 100 rows in the proof file (the full list is tens of MB)
   const rd = c.body?.ResponseData;
@@ -135,21 +139,55 @@ function expectError(c: Call, status: number, msg?: string) {
   if (msg) expect(String(c.body.StatusDescription)).toContain(msg);
 }
 
+// ---------------------------------------------------------------- report (summary.csv / .md / .html)
+function writeReport() {
+  if (!rows.length) return;
+  fs.mkdirSync(REPORT_ROOT, { recursive: true });
+  const stats = rows.reduce((a, r) => ((a[r.status] = (a[r.status] || 0) + 1), a), {} as Record<string, number>);
+  const overall = rows.every(r => r.status === 'PASSED') ? 'PASSED' : 'FAILED';
+  const line = Object.entries(stats).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ');
+  const head = ['#', 'ID', 'Scenario', 'Request', 'Test Status', 'Expected Output', 'System Output', 'Test Remarks'];
+  const data = rows.map((r, i) => [String(i + 1), r.id, r.scenario, r.req, r.status, r.expected, r.actual, r.remarks]);
+  const date = new Date().toISOString().slice(0, 10);
+  // CSV (open in Excel)
+  fs.writeFileSync(path.join(REPORT_ROOT, 'summary.csv'),
+    [head, ...data].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'));
+  // Markdown
+  const cell = (x: string) => String(x).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  let md = `# QB-48 | Testing: Non-Life Production Inquiry (NLPI) APIs\n\n- **Date of testing:** ${date}\n- **Environment:** ${BASE_URL}/${SERVICE_HOST}.svc (UAT)\n- **Test Status:** ${overall} (${line}; ${rows.length} total)\n\n`;
+  md += `| ${head.join(' | ')} |\n|${head.map(() => '---').join('|')}|\n`;
+  for (const r of data) md += `| ${r.map(cell).join(' | ')} |\n`;
+  fs.writeFileSync(path.join(REPORT_ROOT, 'summary.md'), md);
+  // HTML (open in a browser, Ctrl+P to save as PDF)
+  const esc = (x: string) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const color: Record<string, string> = { PASSED: '#1a7f37', FAILED: '#cf222e', 'TIMED OUT': '#cf222e', SKIPPED: '#9a6700' };
+  let html = `<!doctype html><meta charset="utf-8"><title>QB-48 Test Report</title><style>body{font:13px system-ui;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;vertical-align:top;word-break:break-word}th{background:#f3f3f3;text-align:left}.s{font-weight:700}</style>`;
+  html += `<h2>QB-48 | Testing: Non-Life Production Inquiry (NLPI) APIs</h2><p><b>Date:</b> ${date} &nbsp; <b>Env:</b> ${esc(BASE_URL)}/${SERVICE_HOST}.svc (UAT)<br><b>Test Status:</b> <span class="s" style="color:${color[overall]}">${overall}</span> (${esc(line)}; ${rows.length} total)</p>`;
+  html += `<table><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>`;
+  for (const r of data) html += `<tr>${r.map((v, i) => `<td${i === 4 ? ` class="s" style="color:${color[v] || '#000'}"` : ''}>${esc(v)}</td>`).join('')}</tr>`;
+  fs.writeFileSync(path.join(REPORT_ROOT, 'summary.html'), html + '</table>');
+}
+
 // ---------------------------------------------------------------- suite
 let sample: any = null; // a policy taken from the renewal list, reused by C1 / R1 / D-checks
 let pickedPolicy = ''; // a policy taken from the agent list, reused by PD2
 
-test.describe.serial('QB-48 PSNL - NLPI APIs', () => {
+// Tests run in file order (1 worker), but a failure no longer skips the tests after it.
+test.describe('QB-48 PSNL - NLPI APIs', () => {
   test.beforeEach(async ({}, testInfo) => {
     test.skip(testInfo.project.name !== 'Google Chrome', 'API tests run once (Chrome project only).');
     test.skip(!PRIVATE_KEY, 'PSNL_PRIVATE_KEY is not set - see header comment.');
   });
 
-  test.afterAll(async () => {
-    if (summary.length < 2) return;
-    fs.mkdirSync(REPORT_DIR, { recursive: true });
-    const csv = summary.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    fs.writeFileSync(path.join(REPORT_DIR, 'summary.csv'), csv);
+  test.afterEach(async ({}, testInfo) => {
+    const status = testInfo.status === 'passed' ? 'PASSED' : testInfo.status === 'timedOut' ? 'TIMED OUT' : testInfo.status === 'skipped' ? 'SKIPPED' : 'FAILED';
+    const remark = testInfo.annotations.filter(a => a.type === 'remark' || a.type === 'observation').map(a => a.description).join(' ; ');
+    const err = (testInfo.errors[0]?.message || '').replace(/\x1b\[[0-9;]*m/g, '').split('\n').filter(l => l.trim()).slice(0, 3).join(' | ').slice(0, 300);
+    for (const r of rows.filter(x => x.testId === testInfo.testId)) {
+      r.status = status;
+      r.remarks = status === 'PASSED' ? (remark ? `As expected. ${remark}` : 'As expected.') : `${err}${remark ? ' ; ' + remark : ''}`;
+    }
+    writeReport(); // rewrite after every test so the report exists even if the run is stopped
   });
 
   // ================================================================ A. Authentication
@@ -263,7 +301,7 @@ test.describe.serial('QB-48 PSNL - NLPI APIs', () => {
       const p = `${LIST()}?expd=10%2F01%2F2026`;
       const c = await call(request, p);
       record(testInfo, 'C9', 'Other format 10/01/2026', p, '403 (if 200, log for dev review)', c);
-      if (c.body.StatusCode !== 403) testInfo.annotations.push({ type: 'remark', description: `Returned ${c.body.StatusCode} - log for dev review.` });
+      if (c.body.StatusCode !== 403) testInfo.annotations.push({ type: 'remark', description: `FINDING: returned ${c.body.StatusCode} (count ${c.body?.ResponseData?.count ?? '-'}) - expd accepts a non yyyy-MM-dd format (10/01/2026); docs say yyyy-MM-dd. Log for dev review.` });
       expect.soft(c.body.StatusCode).toBe(403);
     });
 
